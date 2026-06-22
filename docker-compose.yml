@@ -9,9 +9,10 @@ services:
     volumes:
       - /home/erwan/docker/downloads:/downloads
       - /home/erwan/docker/media/movies:/movies
-      - /home/erwan/docker/media:/tv
     environment:
       - RADARR_URL=http://192.168.1.146:7878
       - RADARR_API_KEY=19f0730c4619433c973bed6186f7dcef
       - UPLOAD_PATH=/downloads
+      - MOVIES_PATH=/movies
+      - RADARR_ROOT_FOLDER=/movies
     restart: unless-stopped
