@@ -1,16 +1,17 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  media-manager:
+  uploadarr:
     build: .
-    container_name: media-manager
+    container_name: uploadarr
     ports:
       - "5000:5000"
     volumes:
+      - /home/erwan/docker/downloads:/downloads
       - /home/erwan/docker/media/movies:/movies
       - /home/erwan/docker/media:/tv
-      - /home/erwan/docker/downloads:/downloads
     environment:
       - RADARR_URL=http://192.168.1.146:7878
       - RADARR_API_KEY=19f0730c4619433c973bed6186f7dcef
+      - UPLOAD_PATH=/downloads
     restart: unless-stopped
