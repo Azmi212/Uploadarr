@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Upload</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Media Upload</h1>
+        <p class="subtitle">Dépose ton film ou ta série</p>
+
+        <div class="drop-zone" id="dropZone">
+            <span class="drop-icon">📁</span>
+            <p>Glisse ton fichier ici</p>
+            <p>ou</p>
+            <label class="btn" for="fileInput">Parcourir</label>
+            <input type="file" id="fileInput" accept="video/*" hidden>
+        </div>
+
+        <div class="progress-container" id="progressContainer" style="display:none">
+            <p id="filename"></p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText">0%</p>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById("dropZone");
+        const fileInput = document.getElementById("fileInput");
+        const progressContainer = document.getElementById("progressContainer");
+        const progressFill = document.getElementById("progressFill");
+        const progressText = document.getElementById("progressText");
+        const messageDiv = document.getElementById("message");
+        const filenameDiv = document.getElementById("filename");
+
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB par chunk
+
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.classList.add("active");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("active");
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("active");
+            const file = e.dataTransfer.files[0];
+            if (file) uploadFile(file);
+        });
+
+        fileInput.addEventListener("change", () => {
+            const file = fileInput.files[0];
+            if (file) uploadFile(file);
+        });
+
+        async function uploadFile(file) {
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            filenameDiv.textContent = `📽️ ${file.name}`;
+            progressContainer.style.display = "block";
+            messageDiv.innerHTML = "";
+
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append("chunk", chunk);
+                formData.append("filename", file.name);
+                formData.append("chunkIndex", i);
+                formData.append("totalChunks", totalChunks);
+
+                const response = await fetch("/upload/chunk", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+                const percent = Math.round(((i + 1) / totalChunks) * 100);
+                progressFill.style.width = `${percent}%`;
+                progressText.textContent = `${percent}%`;
+
+                if (data.error) {
+                    messageDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                    return;
+                }
+            }
+
+            messageDiv.innerHTML = `<p class="success">✅ Upload terminé ! Radarr est notifié.</p>`;
+        }
+    </script>
+</body>
+</html>
