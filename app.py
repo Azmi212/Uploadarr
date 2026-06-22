@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import requests
+import unicodedata
 from pathlib import Path
 
 app = Flask(__name__)
@@ -135,6 +136,10 @@ def import_movie():
 def clean_movie_name(filename):
     name = Path(filename).stem
 
+    # Corrige les accents bizarres type e + accent séparé
+    name = unicodedata.normalize("NFC", name)
+
+    # Remplace les séparateurs
     name = name.replace(".", " ")
     name = name.replace("_", " ")
     name = name.replace("-", " ")
@@ -145,11 +150,15 @@ def clean_movie_name(filename):
         r"\b2160p\b",
         r"\b4k\b",
         r"\buhd\b",
+        r"\bweb\b",
+        r"\bwebrip\b",
+        r"\bweb-rip\b",
+        r"\bwebdl\b",
+        r"\bweb-dl\b",
+        r"\bweb dl\b",
         r"\bbluray\b",
         r"\bblu ray\b",
-        r"\bwebrip\b",
-        r"\bwebdl\b",
-        r"\bweb dl\b",
+        r"\bbrrip\b",
         r"\bhdrip\b",
         r"\bdvdrip\b",
         r"\bfrench\b",
@@ -164,6 +173,10 @@ def clean_movie_name(filename):
         r"\bhevc\b",
         r"\baac\b",
         r"\bdts\b",
+        r"\b5 1\b",
+        r"\b7 1\b",
+        r"\b10bit\b",
+        r"\b8bit\b",
         r"\byts\b",
         r"\brarbg\b",
         r"\beztv\b",
@@ -192,6 +205,23 @@ def radarr_headers():
 def search_radarr(term):
     print(f"Recherche Radarr : {term}", flush=True)
 
+    results = radarr_lookup(term)
+
+    if results:
+        return results
+
+    # Si aucun résultat, on tente sans l'année
+    term_without_year = re.sub(r"\b(19|20)\d{2}\b", " ", term)
+    term_without_year = re.sub(r"\s+", " ", term_without_year).strip()
+
+    if term_without_year and term_without_year != term:
+        print(f"Aucun résultat. Nouvelle recherche sans année : {term_without_year}", flush=True)
+        results = radarr_lookup(term_without_year)
+
+    return results
+
+
+def radarr_lookup(term):
     response = requests.get(
         f"{RADARR_URL}/api/v3/movie/lookup",
         params={"term": term},
@@ -206,7 +236,6 @@ def search_radarr(term):
         return []
 
     movies = response.json()
-
     results = []
 
     for movie in movies[:8]:
