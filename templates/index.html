@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Upload</title>
+    <title>Uploadarr</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>🎬 Media Upload</h1>
-        <p class="subtitle">Dépose ton film ou ta série</p>
+        <h1>Uploadarr</h1>
+        <p class="subtitle">Upload un film, choisis le bon résultat, Uploadarr l'importe proprement.</p>
 
         <div class="drop-zone" id="dropZone">
-            <span class="drop-icon">📁</span>
-            <p>Glisse ton fichier ici</p>
+            <span class="drop-icon">🎬</span>
+            <p>Glisse ton film ici</p>
             <p>ou</p>
             <label class="btn" for="fileInput">Parcourir</label>
-            <input type="file" id="fileInput" accept="video/*" hidden>
+            <input type="file" id="fileInput" accept="video/*,.mkv,.mp4,.avi,.mov" hidden>
         </div>
 
         <div class="progress-container" id="progressContainer" style="display:none">
@@ -28,6 +28,12 @@
         </div>
 
         <div id="message"></div>
+
+        <div id="results" class="results" style="display:none">
+            <h2>Résultats trouvés</h2>
+            <p id="detectedTitle"></p>
+            <div id="movieResults"></div>
+        </div>
     </div>
 
     <script>
@@ -38,8 +44,13 @@
         const progressText = document.getElementById("progressText");
         const messageDiv = document.getElementById("message");
         const filenameDiv = document.getElementById("filename");
+        const resultsDiv = document.getElementById("results");
+        const detectedTitleDiv = document.getElementById("detectedTitle");
+        const movieResultsDiv = document.getElementById("movieResults");
 
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB par chunk
+        const CHUNK_SIZE = 5 * 1024 * 1024;
+
+        let uploadedFilename = null;
 
         dropZone.addEventListener("dragover", (e) => {
             e.preventDefault();
@@ -64,9 +75,14 @@
 
         async function uploadFile(file) {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-            filenameDiv.textContent = `📽️ ${file.name}`;
+
+            uploadedFilename = file.name;
+
+            filenameDiv.textContent = `Fichier : ${file.name}`;
             progressContainer.style.display = "block";
             messageDiv.innerHTML = "";
+            resultsDiv.style.display = "none";
+            movieResultsDiv.innerHTML = "";
 
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
@@ -85,17 +101,101 @@
                 });
 
                 const data = await response.json();
-                const percent = Math.round(((i + 1) / totalChunks) * 100);
-                progressFill.style.width = `${percent}%`;
-                progressText.textContent = `${percent}%`;
 
                 if (data.error) {
                     messageDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
                     return;
                 }
+
+                const percent = Math.round(((i + 1) / totalChunks) * 100);
+                progressFill.style.width = `${percent}%`;
+                progressText.textContent = `${percent}%`;
+
+                if (i + 1 === totalChunks) {
+                    handleUploadFinished(data);
+                }
+            }
+        }
+
+        function handleUploadFinished(data) {
+            messageDiv.innerHTML = `<p class="success">Upload terminé. Analyse du film terminée.</p>`;
+
+            detectedTitleDiv.textContent = `Titre détecté : ${data.detectedTitle}`;
+
+            if (!data.results || data.results.length === 0) {
+                resultsDiv.style.display = "block";
+                movieResultsDiv.innerHTML = `
+                    <div class="movie-card">
+                        <p>Aucun résultat trouvé. Essaie de renommer le fichier avec le titre du film et l'année.</p>
+                    </div>
+                `;
+                return;
             }
 
-            messageDiv.innerHTML = `<p class="success">✅ Upload terminé ! Radarr est notifié.</p>`;
+            resultsDiv.style.display = "block";
+
+            data.results.forEach((movie) => {
+                const poster = getPoster(movie);
+
+                const card = document.createElement("div");
+                card.className = "movie-card";
+
+                card.innerHTML = `
+                    <div class="poster-wrap">
+                        ${poster ? `<img src="${poster}" alt="${movie.title}">` : `<div class="no-poster">Pas d'affiche</div>`}
+                    </div>
+                    <div class="movie-info">
+                        <h3>${movie.title} (${movie.year || "année inconnue"})</h3>
+                        <p>${movie.overview ? movie.overview.substring(0, 260) + "..." : "Pas de description."}</p>
+                        <button class="btn import-btn">Importer ce film</button>
+                    </div>
+                `;
+
+                card.querySelector(".import-btn").addEventListener("click", () => {
+                    importMovie(movie);
+                });
+
+                movieResultsDiv.appendChild(card);
+            });
+        }
+
+        function getPoster(movie) {
+            if (movie.remotePoster) {
+                return movie.remotePoster;
+            }
+
+            if (movie.images && movie.images.length > 0) {
+                const poster = movie.images.find(img => img.coverType === "poster");
+                if (poster && poster.remoteUrl) {
+                    return poster.remoteUrl;
+                }
+            }
+
+            return null;
+        }
+
+        async function importMovie(movie) {
+            messageDiv.innerHTML = `<p class="success">Import en cours...</p>`;
+
+            const response = await fetch("/import", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    filename: uploadedFilename,
+                    movie: movie
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                messageDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                return;
+            }
+
+            messageDiv.innerHTML = `<p class="success">✅ ${data.message}</p>`;
         }
     </script>
 </body>
