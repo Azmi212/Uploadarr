@@ -14,9 +14,10 @@
 
         <section class="app-card">
             <div class="card-top">
-                <div class="tabs">
-                    <button class="tab active" id="uploadTab">Upload</button>
-                    <button class="tab" id="historyTab">Historique</button>
+                <div class="tabs" id="tabs">
+                    <span class="tab-indicator"></span>
+                    <button class="tab active" id="uploadTab" type="button">Upload</button>
+                    <button class="tab" id="historyTab" type="button">Historique</button>
                 </div>
 
                 <button class="settings-btn" type="button" aria-label="Paramètres">
@@ -55,13 +56,7 @@
                         <span id="importMeta">100% - import prêt</span>
                     </div>
 
-                    <div class="movie-selection" id="movieSelection">
-                        <button class="selected-poster" id="selectedPoster" type="button">
-                            <div class="poster-placeholder">Aucun film</div>
-                        </button>
-
-                        <div class="movie-strip" id="movieResults"></div>
-                    </div>
+                    <div class="movie-strip" id="movieResults"></div>
 
                     <button class="main-btn" id="importBtn" disabled>
                         Importer le film
@@ -99,6 +94,7 @@
     </main>
 
     <script>
+        const tabs = document.getElementById("tabs");
         const uploadTab = document.getElementById("uploadTab");
         const historyTab = document.getElementById("historyTab");
 
@@ -117,8 +113,6 @@
 
         const detectedMovieTitle = document.getElementById("detectedMovieTitle");
         const importMeta = document.getElementById("importMeta");
-        const movieSelection = document.getElementById("movieSelection");
-        const selectedPoster = document.getElementById("selectedPoster");
         const movieResults = document.getElementById("movieResults");
         const importBtn = document.getElementById("importBtn");
 
@@ -134,30 +128,53 @@
         let currentResults = [];
         let history = [];
 
-        function showView(view) {
-            [uploadView, progressView, resultsView, successView, historyView].forEach(v => {
-                v.classList.remove("active");
-            });
+        let activeTab = "upload";
+        let currentUploadView = uploadView;
+        let uploadInProgress = false;
 
+        function hideAllViews() {
+            [uploadView, progressView, resultsView, successView, historyView].forEach(view => {
+                view.classList.remove("active");
+            });
+        }
+
+        function showUploadState(view) {
+            currentUploadView = view;
+
+            if (activeTab !== "upload") {
+                return;
+            }
+
+            hideAllViews();
             view.classList.add("active");
         }
 
-        function setTab(tab) {
+        function showHistory() {
+            activeTab = "history";
+
             uploadTab.classList.remove("active");
-            historyTab.classList.remove("active");
-            tab.classList.add("active");
+            historyTab.classList.add("active");
+            tabs.classList.add("history-active");
+
+            renderHistory();
+
+            hideAllViews();
+            historyView.classList.add("active");
         }
 
-        uploadTab.addEventListener("click", () => {
-            setTab(uploadTab);
-            showView(uploadView);
-        });
+        function showUpload() {
+            activeTab = "upload";
 
-        historyTab.addEventListener("click", () => {
-            setTab(historyTab);
-            renderHistory();
-            showView(historyView);
-        });
+            historyTab.classList.remove("active");
+            uploadTab.classList.add("active");
+            tabs.classList.remove("history-active");
+
+            hideAllViews();
+            currentUploadView.classList.add("active");
+        }
+
+        uploadTab.addEventListener("click", showUpload);
+        historyTab.addEventListener("click", showHistory);
 
         dropZone.addEventListener("dragover", (e) => {
             e.preventDefault();
@@ -188,14 +205,23 @@
             uploadedFilename = file.name;
             selectedMovie = null;
             currentResults = [];
+            uploadInProgress = true;
             importBtn.disabled = true;
 
             progressFilename.textContent = file.name;
             progressMeta.textContent = `0% - 0GB / ${totalSize}`;
             progressFill.style.width = "0%";
 
-            setTab(uploadTab);
-            showView(progressView);
+            showUploadState(progressView);
+
+            history.unshift({
+                title: file.name,
+                time: "upload en cours",
+                size: "0%",
+                status: "progress"
+            });
+
+            renderHistory();
 
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
@@ -216,6 +242,8 @@
                 const data = await response.json();
 
                 if (data.error) {
+                    uploadInProgress = false;
+                    updateLastHistory(file.name, "Erreur", "Erreur", "error");
                     showError(data.error);
                     return;
                 }
@@ -226,7 +254,10 @@
                 progressFill.style.width = `${percent}%`;
                 progressMeta.textContent = `${percent}% - ${uploadedSize} / ${totalSize}`;
 
+                updateLastHistory(file.name, "upload en cours", `${percent}%`, "progress");
+
                 if (i + 1 === totalChunks) {
+                    uploadInProgress = false;
                     handleUploadFinished(data, totalSize);
                 }
             }
@@ -238,19 +269,18 @@
 
             if (!data.results || data.results.length === 0) {
                 detectedMovieTitle.textContent = data.detectedTitle || "Film non détecté";
-                selectedPoster.innerHTML = `<div class="poster-placeholder">Aucun résultat</div>`;
                 movieResults.innerHTML = `
                     <div class="no-result">
                         <p>Aucun résultat trouvé.</p>
                         <button class="retry-btn" onclick="location.reload()">Réessayer</button>
                     </div>
                 `;
-                showView(resultsView);
+                showUploadState(resultsView);
                 return;
             }
 
             renderMovieChoices(data.results);
-            showView(resultsView);
+            showUploadState(resultsView);
         }
 
         function renderMovieChoices(results) {
@@ -258,120 +288,28 @@
             selectedMovie = results[0];
             importBtn.disabled = false;
 
-            applyMovieSelectionLayout();
-            updateSelectedMovie(selectedMovie);
-            renderOtherChoices();
+            renderPosterChoices();
         }
 
-        function applyMovieSelectionLayout() {
-            movieSelection.style.width = "100%";
-            movieSelection.style.maxWidth = "540px";
-            movieSelection.style.height = "170px";
-            movieSelection.style.display = "flex";
-            movieSelection.style.alignItems = "center";
-            movieSelection.style.justifyContent = "center";
-            movieSelection.style.gap = "22px";
-            movieSelection.style.margin = "4px auto 0";
-            movieSelection.style.overflow = "hidden";
-        }
-
-        function updateSelectedMovie(movie) {
-            const poster = getPoster(movie);
-
-            detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
-
-            selectedPoster.innerHTML = "";
-            selectedPoster.style.flex = "0 0 122px";
-            selectedPoster.style.width = "122px";
-            selectedPoster.style.height = "154px";
-            selectedPoster.style.minWidth = "122px";
-            selectedPoster.style.maxWidth = "122px";
-            selectedPoster.style.minHeight = "154px";
-            selectedPoster.style.maxHeight = "154px";
-            selectedPoster.style.padding = "0";
-            selectedPoster.style.margin = "0";
-            selectedPoster.style.border = "3px solid #000";
-            selectedPoster.style.borderRadius = "12px";
-            selectedPoster.style.overflow = "hidden";
-            selectedPoster.style.background = "#101010";
-            selectedPoster.style.display = "block";
-            selectedPoster.style.cursor = "pointer";
-            selectedPoster.style.lineHeight = "0";
-
-            if (poster) {
-                const img = document.createElement("img");
-                img.src = poster;
-                img.alt = movie.title;
-                img.style.width = "100%";
-                img.style.height = "100%";
-                img.style.maxWidth = "100%";
-                img.style.maxHeight = "100%";
-                img.style.objectFit = "cover";
-                img.style.display = "block";
-                img.style.border = "0";
-
-                selectedPoster.appendChild(img);
-            } else {
-                const placeholder = document.createElement("div");
-                placeholder.className = "poster-placeholder";
-                placeholder.textContent = movie.title;
-                selectedPoster.appendChild(placeholder);
-            }
-        }
-
-        function renderOtherChoices() {
+        function renderPosterChoices() {
             movieResults.innerHTML = "";
 
-            movieResults.style.display = "flex";
-            movieResults.style.alignItems = "center";
-            movieResults.style.justifyContent = "flex-start";
-            movieResults.style.gap = "16px";
-            movieResults.style.overflowX = "auto";
-            movieResults.style.overflowY = "hidden";
-            movieResults.style.maxWidth = "390px";
-            movieResults.style.height = "130px";
-            movieResults.style.padding = "10px 4px";
-
             currentResults.forEach((movie) => {
-                if (selectedMovie && movie.tmdbId === selectedMovie.tmdbId) {
-                    return;
-                }
-
                 const poster = getPoster(movie);
 
                 const card = document.createElement("button");
-                card.type = "button";
                 card.className = "poster-card";
+                card.type = "button";
 
-                card.style.position = "relative";
-                card.style.flex = "0 0 86px";
-                card.style.width = "86px";
-                card.style.height = "112px";
-                card.style.minWidth = "86px";
-                card.style.maxWidth = "86px";
-                card.style.minHeight = "112px";
-                card.style.maxHeight = "112px";
-                card.style.padding = "0";
-                card.style.margin = "0";
-                card.style.border = "0";
-                card.style.borderRadius = "12px";
-                card.style.overflow = "hidden";
-                card.style.background = "#101010";
-                card.style.cursor = "pointer";
-                card.style.lineHeight = "0";
+                if (selectedMovie && movie.tmdbId === selectedMovie.tmdbId) {
+                    card.classList.add("active");
+                    detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
+                }
 
                 if (poster) {
                     const img = document.createElement("img");
                     img.src = poster;
                     img.alt = movie.title;
-                    img.style.width = "100%";
-                    img.style.height = "100%";
-                    img.style.maxWidth = "100%";
-                    img.style.maxHeight = "100%";
-                    img.style.objectFit = "cover";
-                    img.style.display = "block";
-                    img.style.filter = "brightness(50%)";
-
                     card.appendChild(img);
                 } else {
                     const placeholder = document.createElement("div");
@@ -380,23 +318,10 @@
                     card.appendChild(placeholder);
                 }
 
-                card.addEventListener("mouseenter", () => {
-                    const img = card.querySelector("img");
-                    if (img) img.style.filter = "brightness(75%)";
-                    card.style.transform = "translateY(-2px)";
-                });
-
-                card.addEventListener("mouseleave", () => {
-                    const img = card.querySelector("img");
-                    if (img) img.style.filter = "brightness(50%)";
-                    card.style.transform = "translateY(0)";
-                });
-
                 card.addEventListener("click", () => {
                     selectedMovie = movie;
-                    updateSelectedMovie(movie);
-                    renderOtherChoices();
                     importBtn.disabled = false;
+                    renderPosterChoices();
                 });
 
                 movieResults.appendChild(card);
@@ -426,24 +351,20 @@
                 showError(data.error);
                 importBtn.disabled = false;
                 importBtn.innerHTML = `Importer le film <img src="/static/assets/upload-2-icon.svg" alt="">`;
+                updateLastHistory(uploadedFilename, "à l’instant", "Erreur", "error");
                 return;
             }
 
             const title = selectedMovie.title + " (" + selectedMovie.year + ")";
 
-            history.unshift({
-                title: title,
-                time: "à l’instant",
-                size: "OK",
-                status: "success"
-            });
+            updateLastHistory(uploadedFilename, "à l’instant", "OK", "success", title);
 
             successTitle.textContent = title;
             successPath.textContent = data.targetPath || "";
 
             importBtn.innerHTML = `Importer le film <img src="/static/assets/upload-2-icon.svg" alt="">`;
 
-            showView(successView);
+            showUploadState(successView);
         });
 
         function renderHistory() {
@@ -458,6 +379,8 @@
                 const row = document.createElement("div");
                 row.className = "history-row";
 
+                const statusClass = item.status === "error" ? "error-tag" : item.status === "progress" ? "progress-tag" : "";
+
                 row.innerHTML = `
                     <div class="history-left">
                         <img src="/static/assets/video-file-icon.svg" alt="">
@@ -467,13 +390,27 @@
                         </div>
                     </div>
                     <div class="history-right">
-                        <span class="size-tag">${item.size}</span>
+                        <span class="size-tag ${statusClass}">${item.size}</span>
                         <span class="dots">⋮</span>
                     </div>
                 `;
 
                 historyList.appendChild(row);
             });
+        }
+
+        function updateLastHistory(originalTitle, time, size, status, newTitle = null) {
+            const item = history.find(entry => entry.title === originalTitle || entry.originalTitle === originalTitle);
+
+            if (!item) return;
+
+            item.originalTitle = originalTitle;
+            item.title = newTitle || item.title;
+            item.time = time;
+            item.size = size;
+            item.status = status;
+
+            renderHistory();
         }
 
         function getPoster(movie) {
@@ -488,16 +425,8 @@
         }
 
         function showError(error) {
-            history.unshift({
-                title: uploadedFilename || "Upload",
-                time: "à l’instant",
-                size: "Erreur",
-                status: "error"
-            });
-
             detectedMovieTitle.textContent = "Erreur";
             importMeta.textContent = error;
-            selectedPoster.innerHTML = `<div class="poster-placeholder">Erreur</div>`;
             movieResults.innerHTML = `
                 <div class="no-result">
                     <p>${error}</p>
@@ -507,7 +436,8 @@
                     </button>
                 </div>
             `;
-            showView(resultsView);
+
+            showUploadState(resultsView);
         }
 
         function formatSize(bytes) {
