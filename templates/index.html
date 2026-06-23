@@ -55,7 +55,7 @@
                         <span id="importMeta">100% - import prêt</span>
                     </div>
 
-                    <div class="movie-selection">
+                    <div class="movie-selection" id="movieSelection">
                         <button class="selected-poster" id="selectedPoster" type="button">
                             <div class="poster-placeholder">Aucun film</div>
                         </button>
@@ -117,6 +117,7 @@
 
         const detectedMovieTitle = document.getElementById("detectedMovieTitle");
         const importMeta = document.getElementById("importMeta");
+        const movieSelection = document.getElementById("movieSelection");
         const selectedPoster = document.getElementById("selectedPoster");
         const movieResults = document.getElementById("movieResults");
         const importBtn = document.getElementById("importBtn");
@@ -241,9 +242,7 @@
                 movieResults.innerHTML = `
                     <div class="no-result">
                         <p>Aucun résultat trouvé.</p>
-                        <button class="retry-btn" onclick="location.reload()">
-                            Réessayer
-                        </button>
+                        <button class="retry-btn" onclick="location.reload()">Réessayer</button>
                     </div>
                 `;
                 showView(resultsView);
@@ -259,8 +258,21 @@
             selectedMovie = results[0];
             importBtn.disabled = false;
 
+            applyMovieSelectionLayout();
             updateSelectedMovie(selectedMovie);
             renderOtherChoices();
+        }
+
+        function applyMovieSelectionLayout() {
+            movieSelection.style.width = "100%";
+            movieSelection.style.maxWidth = "540px";
+            movieSelection.style.height = "170px";
+            movieSelection.style.display = "flex";
+            movieSelection.style.alignItems = "center";
+            movieSelection.style.justifyContent = "center";
+            movieSelection.style.gap = "22px";
+            movieSelection.style.margin = "4px auto 0";
+            movieSelection.style.overflow = "hidden";
         }
 
         function updateSelectedMovie(movie) {
@@ -268,13 +280,57 @@
 
             detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
 
-            selectedPoster.innerHTML = poster
-                ? `<img src="${poster}" alt="${movie.title}">`
-                : `<div class="poster-placeholder">${movie.title}</div>`;
+            selectedPoster.innerHTML = "";
+            selectedPoster.style.flex = "0 0 122px";
+            selectedPoster.style.width = "122px";
+            selectedPoster.style.height = "154px";
+            selectedPoster.style.minWidth = "122px";
+            selectedPoster.style.maxWidth = "122px";
+            selectedPoster.style.minHeight = "154px";
+            selectedPoster.style.maxHeight = "154px";
+            selectedPoster.style.padding = "0";
+            selectedPoster.style.margin = "0";
+            selectedPoster.style.border = "3px solid #000";
+            selectedPoster.style.borderRadius = "12px";
+            selectedPoster.style.overflow = "hidden";
+            selectedPoster.style.background = "#101010";
+            selectedPoster.style.display = "block";
+            selectedPoster.style.cursor = "pointer";
+            selectedPoster.style.lineHeight = "0";
+
+            if (poster) {
+                const img = document.createElement("img");
+                img.src = poster;
+                img.alt = movie.title;
+                img.style.width = "100%";
+                img.style.height = "100%";
+                img.style.maxWidth = "100%";
+                img.style.maxHeight = "100%";
+                img.style.objectFit = "cover";
+                img.style.display = "block";
+                img.style.border = "0";
+
+                selectedPoster.appendChild(img);
+            } else {
+                const placeholder = document.createElement("div");
+                placeholder.className = "poster-placeholder";
+                placeholder.textContent = movie.title;
+                selectedPoster.appendChild(placeholder);
+            }
         }
 
         function renderOtherChoices() {
             movieResults.innerHTML = "";
+
+            movieResults.style.display = "flex";
+            movieResults.style.alignItems = "center";
+            movieResults.style.justifyContent = "flex-start";
+            movieResults.style.gap = "16px";
+            movieResults.style.overflowX = "auto";
+            movieResults.style.overflowY = "hidden";
+            movieResults.style.maxWidth = "390px";
+            movieResults.style.height = "130px";
+            movieResults.style.padding = "10px 4px";
 
             currentResults.forEach((movie) => {
                 if (selectedMovie && movie.tmdbId === selectedMovie.tmdbId) {
@@ -284,12 +340,57 @@
                 const poster = getPoster(movie);
 
                 const card = document.createElement("button");
-                card.className = "poster-card";
                 card.type = "button";
+                card.className = "poster-card";
 
-                card.innerHTML = poster
-                    ? `<img src="${poster}" alt="${movie.title}">`
-                    : `<div class="poster-placeholder">${movie.title}</div>`;
+                card.style.position = "relative";
+                card.style.flex = "0 0 86px";
+                card.style.width = "86px";
+                card.style.height = "112px";
+                card.style.minWidth = "86px";
+                card.style.maxWidth = "86px";
+                card.style.minHeight = "112px";
+                card.style.maxHeight = "112px";
+                card.style.padding = "0";
+                card.style.margin = "0";
+                card.style.border = "0";
+                card.style.borderRadius = "12px";
+                card.style.overflow = "hidden";
+                card.style.background = "#101010";
+                card.style.cursor = "pointer";
+                card.style.lineHeight = "0";
+
+                if (poster) {
+                    const img = document.createElement("img");
+                    img.src = poster;
+                    img.alt = movie.title;
+                    img.style.width = "100%";
+                    img.style.height = "100%";
+                    img.style.maxWidth = "100%";
+                    img.style.maxHeight = "100%";
+                    img.style.objectFit = "cover";
+                    img.style.display = "block";
+                    img.style.filter = "brightness(50%)";
+
+                    card.appendChild(img);
+                } else {
+                    const placeholder = document.createElement("div");
+                    placeholder.className = "poster-placeholder";
+                    placeholder.textContent = movie.title;
+                    card.appendChild(placeholder);
+                }
+
+                card.addEventListener("mouseenter", () => {
+                    const img = card.querySelector("img");
+                    if (img) img.style.filter = "brightness(75%)";
+                    card.style.transform = "translateY(-2px)";
+                });
+
+                card.addEventListener("mouseleave", () => {
+                    const img = card.querySelector("img");
+                    if (img) img.style.filter = "brightness(50%)";
+                    card.style.transform = "translateY(0)";
+                });
 
                 card.addEventListener("click", () => {
                     selectedMovie = movie;
