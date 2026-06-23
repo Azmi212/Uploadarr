@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./static/assets/logo.svg" alt="Seerr" style="margin: 20px 0;">
+<img src="./static/assets/logo.png" alt="Seerr" style="margin: 20px 0;">
 </p>
 <p align="center">
 <img src="https://github.com/seerr-team/seerr/actions/workflows/release.yml/badge.svg" alt="Seerr Release" />
