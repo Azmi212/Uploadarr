@@ -7,50 +7,148 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Uploadarr</h1>
-        <p class="subtitle">Upload un film, choisis le bon résultat, Uploadarr l'importe proprement.</p>
+    <main class="page">
+        <header class="brand">
+            <img src="/static/assets/logo.svg" alt="Uploadarr" class="brand-logo">
+        </header>
 
-        <div class="drop-zone" id="dropZone">
-            <span class="drop-icon">🎬</span>
-            <p>Glisse ton film ici</p>
-            <p>ou</p>
-            <label class="btn" for="fileInput">Parcourir</label>
-            <input type="file" id="fileInput" accept="video/*,.mkv,.mp4,.avi,.mov" hidden>
-        </div>
+        <section class="app-card">
+            <div class="card-top">
+                <div class="tabs">
+                    <button class="tab active" id="uploadTab">Upload</button>
+                    <button class="tab" id="historyTab">Historique</button>
+                </div>
 
-        <div class="progress-container" id="progressContainer" style="display:none">
-            <p id="filename"></p>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
+                <button class="settings-btn" type="button" aria-label="Paramètres">
+                    <img src="/static/assets/settings-icon.svg" alt="">
+                </button>
             </div>
-            <p id="progressText">0%</p>
-        </div>
 
-        <div id="message"></div>
+            <div class="card-content">
+                <!-- UPLOAD -->
+                <div class="view active" id="uploadView">
+                    <div class="drop-zone" id="dropZone">
+                        <img src="/static/assets/upload-icon.svg" alt="" class="upload-icon">
+                        <p>Cliquez ou faites glisser<br>le film dans cette zone pour l’upload</p>
+                        <label class="small-btn" for="fileInput">Parcourir</label>
+                        <input type="file" id="fileInput" accept="video/*,.mkv,.mp4,.avi,.mov" hidden>
+                    </div>
+                </div>
 
-        <div id="results" class="results" style="display:none">
-            <h2>Résultats trouvés</h2>
-            <p id="detectedTitle"></p>
-            <div id="movieResults"></div>
-        </div>
-    </div>
+                <!-- PROGRESS -->
+                <div class="view" id="progressView">
+                    <div class="progress-box">
+                        <h2 id="progressFilename">Nom du fichier</h2>
+                        <p id="progressMeta">0% - 0GB / 0GB</p>
+
+                        <div class="progress-track">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RESULTS -->
+                <div class="view" id="resultsView">
+                    <div class="import-header">
+                        <p>Film détecté :</p>
+                        <h2 id="detectedMovieTitle">Titre du film</h2>
+                        <span id="importMeta">100% - import prêt</span>
+                    </div>
+
+                    <div class="movie-strip" id="movieResults"></div>
+
+                    <button class="main-btn" id="importBtn" disabled>
+                        Importer le film
+                        <img src="/static/assets/upload-2-icon.svg" alt="">
+                    </button>
+                </div>
+
+                <!-- SUCCESS -->
+                <div class="view" id="successView">
+                    <div class="success-box">
+                        <img src="/static/assets/Tick icon.svg" alt="" class="success-icon">
+                        <p>Film importé :</p>
+                        <h2 id="successTitle">Film</h2>
+                        <span id="successPath"></span>
+                    </div>
+                </div>
+
+                <!-- HISTORY -->
+                <div class="view" id="historyView">
+                    <div class="history-list" id="historyList">
+                        <p class="empty-history">Aucun upload pour le moment.</p>
+                    </div>
+
+                    <button class="show-all-btn" type="button">Afficher tous les uploads</button>
+                </div>
+            </div>
+
+            <footer class="card-footer">
+                <img src="/static/assets/Tick icon.svg" alt="">
+                <span>Aucune limite d’upload. Pour toujours.</span>
+            </footer>
+        </section>
+
+        <footer class="creator">Créer par AZMI212</footer>
+    </main>
 
     <script>
+        const uploadTab = document.getElementById("uploadTab");
+        const historyTab = document.getElementById("historyTab");
+
+        const uploadView = document.getElementById("uploadView");
+        const progressView = document.getElementById("progressView");
+        const resultsView = document.getElementById("resultsView");
+        const successView = document.getElementById("successView");
+        const historyView = document.getElementById("historyView");
+
         const dropZone = document.getElementById("dropZone");
         const fileInput = document.getElementById("fileInput");
-        const progressContainer = document.getElementById("progressContainer");
+
+        const progressFilename = document.getElementById("progressFilename");
+        const progressMeta = document.getElementById("progressMeta");
         const progressFill = document.getElementById("progressFill");
-        const progressText = document.getElementById("progressText");
-        const messageDiv = document.getElementById("message");
-        const filenameDiv = document.getElementById("filename");
-        const resultsDiv = document.getElementById("results");
-        const detectedTitleDiv = document.getElementById("detectedTitle");
-        const movieResultsDiv = document.getElementById("movieResults");
+
+        const detectedMovieTitle = document.getElementById("detectedMovieTitle");
+        const importMeta = document.getElementById("importMeta");
+        const movieResults = document.getElementById("movieResults");
+        const importBtn = document.getElementById("importBtn");
+
+        const successTitle = document.getElementById("successTitle");
+        const successPath = document.getElementById("successPath");
+
+        const historyList = document.getElementById("historyList");
 
         const CHUNK_SIZE = 5 * 1024 * 1024;
 
         let uploadedFilename = null;
+        let selectedMovie = null;
+        let history = [];
+
+        function showView(view) {
+            [uploadView, progressView, resultsView, successView, historyView].forEach(v => {
+                v.classList.remove("active");
+            });
+
+            view.classList.add("active");
+        }
+
+        function setTab(tab) {
+            uploadTab.classList.remove("active");
+            historyTab.classList.remove("active");
+            tab.classList.add("active");
+        }
+
+        uploadTab.addEventListener("click", () => {
+            setTab(uploadTab);
+            showView(uploadView);
+        });
+
+        historyTab.addEventListener("click", () => {
+            setTab(historyTab);
+            renderHistory();
+            showView(historyView);
+        });
 
         dropZone.addEventListener("dragover", (e) => {
             e.preventDefault();
@@ -64,6 +162,7 @@
         dropZone.addEventListener("drop", (e) => {
             e.preventDefault();
             dropZone.classList.remove("active");
+
             const file = e.dataTransfer.files[0];
             if (file) uploadFile(file);
         });
@@ -75,14 +174,18 @@
 
         async function uploadFile(file) {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            const totalSize = formatSize(file.size);
 
             uploadedFilename = file.name;
+            selectedMovie = null;
+            importBtn.disabled = true;
 
-            filenameDiv.textContent = `Fichier : ${file.name}`;
-            progressContainer.style.display = "block";
-            messageDiv.innerHTML = "";
-            resultsDiv.style.display = "none";
-            movieResultsDiv.innerHTML = "";
+            progressFilename.textContent = file.name;
+            progressMeta.textContent = `0% - 0GB / ${totalSize}`;
+            progressFill.style.width = "0%";
+
+            setTab(uploadTab);
+            showView(progressView);
 
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
@@ -103,79 +206,79 @@
                 const data = await response.json();
 
                 if (data.error) {
-                    messageDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                    showError(data.error);
                     return;
                 }
 
                 const percent = Math.round(((i + 1) / totalChunks) * 100);
+                const uploadedSize = formatSize(Math.min(end, file.size));
+
                 progressFill.style.width = `${percent}%`;
-                progressText.textContent = `${percent}%`;
+                progressMeta.textContent = `${percent}% - ${uploadedSize} / ${totalSize}`;
 
                 if (i + 1 === totalChunks) {
-                    handleUploadFinished(data);
+                    handleUploadFinished(data, totalSize);
                 }
             }
         }
 
-        function handleUploadFinished(data) {
-            messageDiv.innerHTML = `<p class="success">Upload terminé. Analyse du film terminée.</p>`;
-
-            detectedTitleDiv.textContent = `Titre détecté : ${data.detectedTitle}`;
+        function handleUploadFinished(data, totalSize) {
+            detectedMovieTitle.textContent = data.detectedTitle || "Film non détecté";
+            importMeta.textContent = `100% - ${totalSize} / ${totalSize}`;
+            movieResults.innerHTML = "";
 
             if (!data.results || data.results.length === 0) {
-                resultsDiv.style.display = "block";
-                movieResultsDiv.innerHTML = `
-                    <div class="movie-card">
-                        <p>Aucun résultat trouvé. Essaie de renommer le fichier avec le titre du film et l'année.</p>
+                movieResults.innerHTML = `
+                    <div class="no-result">
+                        <p>Aucun résultat trouvé.</p>
+                        <button class="retry-btn" onclick="location.reload()">
+                            Réessayer
+                        </button>
                     </div>
                 `;
+                showView(resultsView);
                 return;
             }
 
-            resultsDiv.style.display = "block";
-
-            data.results.forEach((movie) => {
+            data.results.forEach((movie, index) => {
                 const poster = getPoster(movie);
 
-                const card = document.createElement("div");
-                card.className = "movie-card";
+                const card = document.createElement("button");
+                card.className = "poster-card";
+                card.type = "button";
 
-                card.innerHTML = `
-                    <div class="poster-wrap">
-                        ${poster ? `<img src="${poster}" alt="${movie.title}">` : `<div class="no-poster">Pas d'affiche</div>`}
-                    </div>
-                    <div class="movie-info">
-                        <h3>${movie.title} (${movie.year || "année inconnue"})</h3>
-                        <p>${movie.overview ? movie.overview.substring(0, 260) + "..." : "Pas de description."}</p>
-                        <button class="btn import-btn">Importer ce film</button>
-                    </div>
-                `;
+                if (index === 0) {
+                    card.classList.add("selected");
+                    selectedMovie = movie;
+                    importBtn.disabled = false;
+                }
 
-                card.querySelector(".import-btn").addEventListener("click", () => {
-                    importMovie(movie);
+                card.innerHTML = poster
+                    ? `<img src="${poster}" alt="${movie.title}">`
+                    : `<div class="poster-placeholder">${movie.title}</div>`;
+
+                card.addEventListener("click", () => {
+                    document.querySelectorAll(".poster-card").forEach(c => c.classList.remove("selected"));
+                    card.classList.add("selected");
+                    selectedMovie = movie;
+                    detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
+                    importBtn.disabled = false;
                 });
 
-                movieResultsDiv.appendChild(card);
+                movieResults.appendChild(card);
             });
+
+            const firstMovie = data.results[0];
+            detectedMovieTitle.textContent = `${firstMovie.title} (${firstMovie.year || "?"})`;
+
+            showView(resultsView);
         }
 
-        function getPoster(movie) {
-            if (movie.remotePoster) {
-                return movie.remotePoster;
-            }
+        importBtn.addEventListener("click", async () => {
+            if (!selectedMovie || !uploadedFilename) return;
 
-            if (movie.images && movie.images.length > 0) {
-                const poster = movie.images.find(img => img.coverType === "poster");
-                if (poster && poster.remoteUrl) {
-                    return poster.remoteUrl;
-                }
-            }
-
-            return null;
-        }
-
-        async function importMovie(movie) {
-            messageDiv.innerHTML = `<p class="success">Import en cours...</p>`;
+            importBtn.disabled = true;
+            importBtn.innerHTML = "Import en cours...";
 
             const response = await fetch("/import", {
                 method: "POST",
@@ -184,18 +287,107 @@
                 },
                 body: JSON.stringify({
                     filename: uploadedFilename,
-                    movie: movie
+                    movie: selectedMovie
                 })
             });
 
             const data = await response.json();
 
             if (data.error) {
-                messageDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                showError(data.error);
+                importBtn.disabled = false;
+                importBtn.innerHTML = `Importer le film <img src="/static/assets/upload-2-icon.svg" alt="">`;
                 return;
             }
 
-            messageDiv.innerHTML = `<p class="success">✅ ${data.message}</p>`;
+            const title = selectedMovie.title + " (" + selectedMovie.year + ")";
+
+            history.unshift({
+                title: title,
+                time: "à l’instant",
+                size: "OK",
+                status: "success"
+            });
+
+            successTitle.textContent = title;
+            successPath.textContent = data.targetPath || "";
+
+            importBtn.innerHTML = `Importer le film <img src="/static/assets/upload-2-icon.svg" alt="">`;
+
+            showView(successView);
+        });
+
+        function renderHistory() {
+            if (history.length === 0) {
+                historyList.innerHTML = `<p class="empty-history">Aucun upload pour le moment.</p>`;
+                return;
+            }
+
+            historyList.innerHTML = "";
+
+            history.forEach(item => {
+                const row = document.createElement("div");
+                row.className = "history-row";
+
+                row.innerHTML = `
+                    <div class="history-left">
+                        <img src="/static/assets/video-file-icon.svg" alt="">
+                        <div>
+                            <strong>${item.title}</strong>
+                            <span>${item.time}</span>
+                        </div>
+                    </div>
+                    <div class="history-right">
+                        <span class="size-tag">${item.size}</span>
+                        <span class="dots">⋮</span>
+                    </div>
+                `;
+
+                historyList.appendChild(row);
+            });
+        }
+
+        function getPoster(movie) {
+            if (movie.remotePoster) return movie.remotePoster;
+
+            if (movie.images && movie.images.length > 0) {
+                const poster = movie.images.find(img => img.coverType === "poster");
+                if (poster && poster.remoteUrl) return poster.remoteUrl;
+            }
+
+            return null;
+        }
+
+        function showError(error) {
+            history.unshift({
+                title: uploadedFilename || "Upload",
+                time: "à l’instant",
+                size: "Erreur",
+                status: "error"
+            });
+
+            detectedMovieTitle.textContent = "Erreur";
+            importMeta.textContent = error;
+            movieResults.innerHTML = `
+                <div class="no-result">
+                    <p>${error}</p>
+                    <button class="retry-btn" onclick="location.reload()">
+                        <img src="/static/assets/retry-icon.svg" alt="">
+                        Réessayer
+                    </button>
+                </div>
+            `;
+            showView(resultsView);
+        }
+
+        function formatSize(bytes) {
+            if (!bytes || bytes === 0) return "0GB";
+
+            const gb = bytes / (1024 * 1024 * 1024);
+            if (gb >= 1) return `${gb.toFixed(1)}GB`;
+
+            const mb = bytes / (1024 * 1024);
+            return `${Math.round(mb)}MB`;
         }
     </script>
 </body>
