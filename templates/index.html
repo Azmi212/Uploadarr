@@ -55,7 +55,13 @@
                         <span id="importMeta">100% - import prêt</span>
                     </div>
 
-                    <div class="movie-strip" id="movieResults"></div>
+                    <div class="movie-selection">
+                        <button class="selected-poster" id="selectedPoster" type="button">
+                            <div class="poster-placeholder">Aucun film</div>
+                        </button>
+
+                        <div class="movie-strip" id="movieResults"></div>
+                    </div>
 
                     <button class="main-btn" id="importBtn" disabled>
                         Importer le film
@@ -66,7 +72,7 @@
                 <!-- SUCCESS -->
                 <div class="view" id="successView">
                     <div class="success-box">
-                        <img src="/static/assets/-icon.svg" alt="" class="success-icon">
+                        <img src="/static/assets/tick-icon.svg" alt="" class="success-icon">
                         <p>Film importé :</p>
                         <h2 id="successTitle">Film</h2>
                         <span id="successPath"></span>
@@ -111,6 +117,7 @@
 
         const detectedMovieTitle = document.getElementById("detectedMovieTitle");
         const importMeta = document.getElementById("importMeta");
+        const selectedPoster = document.getElementById("selectedPoster");
         const movieResults = document.getElementById("movieResults");
         const importBtn = document.getElementById("importBtn");
 
@@ -123,6 +130,7 @@
 
         let uploadedFilename = null;
         let selectedMovie = null;
+        let currentResults = [];
         let history = [];
 
         function showView(view) {
@@ -178,6 +186,7 @@
 
             uploadedFilename = file.name;
             selectedMovie = null;
+            currentResults = [];
             importBtn.disabled = true;
 
             progressFilename.textContent = file.name;
@@ -223,11 +232,12 @@
         }
 
         function handleUploadFinished(data, totalSize) {
-            detectedMovieTitle.textContent = data.detectedTitle || "Film non détecté";
             importMeta.textContent = `100% - ${totalSize} / ${totalSize}`;
             movieResults.innerHTML = "";
 
             if (!data.results || data.results.length === 0) {
+                detectedMovieTitle.textContent = data.detectedTitle || "Film non détecté";
+                selectedPoster.innerHTML = `<div class="poster-placeholder">Aucun résultat</div>`;
                 movieResults.innerHTML = `
                     <div class="no-result">
                         <p>Aucun résultat trouvé.</p>
@@ -240,38 +250,56 @@
                 return;
             }
 
-            data.results.forEach((movie, index) => {
+            renderMovieChoices(data.results);
+            showView(resultsView);
+        }
+
+        function renderMovieChoices(results) {
+            currentResults = results;
+            selectedMovie = results[0];
+            importBtn.disabled = false;
+
+            updateSelectedMovie(selectedMovie);
+            renderOtherChoices();
+        }
+
+        function updateSelectedMovie(movie) {
+            const poster = getPoster(movie);
+
+            detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
+
+            selectedPoster.innerHTML = poster
+                ? `<img src="${poster}" alt="${movie.title}">`
+                : `<div class="poster-placeholder">${movie.title}</div>`;
+        }
+
+        function renderOtherChoices() {
+            movieResults.innerHTML = "";
+
+            currentResults.forEach((movie) => {
+                if (selectedMovie && movie.tmdbId === selectedMovie.tmdbId) {
+                    return;
+                }
+
                 const poster = getPoster(movie);
 
                 const card = document.createElement("button");
                 card.className = "poster-card";
                 card.type = "button";
 
-                if (index === 0) {
-                    card.classList.add("selected");
-                    selectedMovie = movie;
-                    importBtn.disabled = false;
-                }
-
                 card.innerHTML = poster
                     ? `<img src="${poster}" alt="${movie.title}">`
                     : `<div class="poster-placeholder">${movie.title}</div>`;
 
                 card.addEventListener("click", () => {
-                    document.querySelectorAll(".poster-card").forEach(c => c.classList.remove("selected"));
-                    card.classList.add("selected");
                     selectedMovie = movie;
-                    detectedMovieTitle.textContent = `${movie.title} (${movie.year || "?"})`;
+                    updateSelectedMovie(movie);
+                    renderOtherChoices();
                     importBtn.disabled = false;
                 });
 
                 movieResults.appendChild(card);
             });
-
-            const firstMovie = data.results[0];
-            detectedMovieTitle.textContent = `${firstMovie.title} (${firstMovie.year || "?"})`;
-
-            showView(resultsView);
         }
 
         importBtn.addEventListener("click", async () => {
@@ -368,6 +396,7 @@
 
             detectedMovieTitle.textContent = "Erreur";
             importMeta.textContent = error;
+            selectedPoster.innerHTML = `<div class="poster-placeholder">Erreur</div>`;
             movieResults.innerHTML = `
                 <div class="no-result">
                     <p>${error}</p>
